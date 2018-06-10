@@ -112,6 +112,15 @@ void make_fork (char *searchpath, char **files, int current_offset, int total, i
                 break;
             default: // Parent process
                 make_fork(searchpath, files, current_offset + 1, total, casein, rec);
+
+                pid = 0;
+                int status = 0;
+
+                pid = getpid();
+
+                //wait for the child
+                pid = wait(&status);
+
                 break;
         }
     }
@@ -164,8 +173,8 @@ int main (int argc, char* argv[])
     printf("\nEntered files:\n");
 
     // Get remaining files
-    char* files[argc - optind];
-    int file_amount = argc - optind;
+    char* files[argc - optind - 1];
+    int file_amount = argc - optind - 1;
 
     for (int i = optind + 1; i < argc; i++)
     {
