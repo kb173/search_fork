@@ -4,6 +4,9 @@
 /* Include Datei für getopt(); getopt.h geht auch, ist aber älter. */
 #include <unistd.h>
 #include <limits.h>
+#include <dirent.h>
+#include <errno.h>
+#include <string.h>
 
 void print_usage(char *programm_name)
 {
@@ -36,6 +39,31 @@ char* get_full_path(char *path)
     }
 
     return full_path;
+}
+
+int search_dir(char *path, char *file)
+{
+    struct dirent *direntp;
+    DIR *dirp;
+    int found = 0;
+
+    if ((dirp = opendir(path)) == NULL)
+    {
+        perror("Failed to open directory");
+        return 0;
+    }
+
+    while ((direntp = readdir(dirp)) != NULL)
+    {
+        if (strcmp(direntp->d_name, file) == 0)
+        {
+            found = 1;
+        }
+    }
+
+    while ((closedir(dirp) == -1) && (errno == EINTR));
+
+    return found;
 }
 
 int main (int argc, char* argv[])
@@ -102,5 +130,10 @@ int main (int argc, char* argv[])
         exit(1);
     }
 
-    printf("Full path: %s\n", full_path);
+    printf("Full searchpath: %s\n", full_path);
+
+    if (search_dir(full_path, files[0]))
+    {
+        printf("Found!\n");
+    }
 }
