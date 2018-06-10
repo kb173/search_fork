@@ -7,6 +7,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 
 void print_usage(char *programm_name)
 {
@@ -41,7 +44,19 @@ char* get_full_path(char *path)
     return full_path;
 }
 
-int search_dir(char *path, char *file, int casein)
+int is_directory(char *path) {
+   struct stat statbuf;
+
+   if (stat(path, &statbuf) < 0)
+   {
+        //printf("Couldn't get stat for %s", path);
+        return 0;
+   }
+
+   return S_ISDIR(statbuf.st_mode);
+}
+
+int search_dir(char *path, char *file, int casein, int rec)
 {
     struct dirent *direntp;
     DIR *dirp;
@@ -54,7 +69,22 @@ int search_dir(char *path, char *file, int casein)
 
     while ((direntp = readdir(dirp)) != NULL)
     {
-        if ((casein && strcasecmp(direntp->d_name, file) == 0) || strcmp(direntp->d_name, file) == 0)
+        // Check for . or ..
+        if (strcmp(direntp->d_name, ".") == 0 || strcmp(direntp->d_name, "..") == 0)
+        {
+            continue;
+        }
+
+        char full_path[255];
+        strcpy(full_path, path);
+        strcat(full_path, "/");
+        strcat(full_path, direntp->d_name);
+
+        if (rec && is_directory(full_path))
+        {
+            search_dir(full_path, file, casein, rec);
+        }
+        else if ((casein && strcasecmp(direntp->d_name, file) == 0) || strcmp(direntp->d_name, file) == 0)
         {
             printf("%i: %s: %s\n", getpid(), file, get_full_path(path));
         }
@@ -65,7 +95,7 @@ int search_dir(char *path, char *file, int casein)
     return 1;
 }
 
-void make_fork (char *searchpath, char **files, int current_offset, int total, int casein)
+void make_fork (char *searchpath, char **files, int current_offset, int total, int casein, int rec)
 {
     if (current_offset < total)
     {
@@ -78,10 +108,10 @@ void make_fork (char *searchpath, char **files, int current_offset, int total, i
                 exit(1);
                 break;
             case 0: // Child process
-                search_dir(searchpath, files[current_offset], casein);
+                search_dir(searchpath, files[current_offset], casein, rec);
                 break;
             default: // Parent process
-                make_fork(searchpath, files, current_offset + 1, total, casein);
+                make_fork(searchpath, files, current_offset + 1, total, casein, rec);
                 break;
         }
     }
@@ -154,10 +184,7 @@ int main (int argc, char* argv[])
 
     printf("Full searchpath: %s\n", full_path);
 
-    for (int i = 0; i < file_amount; i++)
-    {
+    make_fork (searchpath, files, 0, file_amount, casein, rec);
 
-    }
-
-    make_fork (searchpath, files, 0, file_amount, casein);
+    return 0;
 }
