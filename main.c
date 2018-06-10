@@ -41,11 +41,10 @@ char* get_full_path(char *path)
     return full_path;
 }
 
-int search_dir(char *path, char *file)
+int search_dir(char *path, char *file, int casein)
 {
     struct dirent *direntp;
     DIR *dirp;
-    int found = 0;
 
     if ((dirp = opendir(path)) == NULL)
     {
@@ -55,15 +54,37 @@ int search_dir(char *path, char *file)
 
     while ((direntp = readdir(dirp)) != NULL)
     {
-        if (strcmp(direntp->d_name, file) == 0)
+        if ((casein && strcasecmp(direntp->d_name, file) == 0) || strcmp(direntp->d_name, file) == 0)
         {
-            found = 1;
+            printf("%i: %s: %s\n", getpid(), file, get_full_path(path));
         }
     }
 
     while ((closedir(dirp) == -1) && (errno == EINTR));
 
-    return found;
+    return 1;
+}
+
+void make_fork (char *searchpath, char **files, int current_offset, int total, int casein)
+{
+    if (current_offset < total)
+    {
+        int pid = fork();
+
+        switch (pid)
+        {
+            case -1:
+                printf("Child couldn't be started");
+                exit(1);
+                break;
+            case 0: // Child process
+                search_dir(searchpath, files[current_offset], casein);
+                break;
+            default: // Parent process
+                make_fork(searchpath, files, current_offset + 1, total, casein);
+                break;
+        }
+    }
 }
 
 int main (int argc, char* argv[])
@@ -114,6 +135,7 @@ int main (int argc, char* argv[])
 
     // Get remaining files
     char* files[argc - optind];
+    int file_amount = argc - optind;
 
     for (int i = optind + 1; i < argc; i++)
     {
@@ -132,8 +154,10 @@ int main (int argc, char* argv[])
 
     printf("Full searchpath: %s\n", full_path);
 
-    if (search_dir(full_path, files[0]))
+    for (int i = 0; i < file_amount; i++)
     {
-        printf("Found!\n");
+
     }
+
+    make_fork (searchpath, files, 0, file_amount, casein);
 }
